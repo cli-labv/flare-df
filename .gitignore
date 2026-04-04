@@ -1,0 +1,28 @@
+# Build
+/target/
+Cargo.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Entorno
+.env
+
+# Archivos temporales
+temp/
+*.tmp
+*.bak
+*~
+
+# Carpeta de salida (PDFs comprimidos)
+output/*.pdf
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
