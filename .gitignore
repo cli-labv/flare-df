@@ -20,6 +20,9 @@ temp/
 # Carpeta de salida (PDFs comprimidos)
 output/*.pdf
 
+# Carpeta de entrada (PDFs originales)
+input/*.pdf
+
 # Sistema operativo
 .DS_Store
 Thumbs.db
