@@ -1,31 +1,83 @@
-# Build
+# ============================================
+# 🔥 FLARE-DF - Git Ignore Configuration
+# ============================================
+
+# ==================== Rust Build ====================
 /target/
 Cargo.lock
+*.rlib
+*.rmeta
 
-# IDE
+# ==================== IDE & Editors ====================
 .idea/
 .vscode/
 *.swp
 *.swo
+*~
+.vim/
+.project
+.settings/
+*.sublime-*
 
-# Entorno
+# ==================== Environment & Secrets ====================
 .env
+.env.local
+.env.*.local
 
-# Archivos temporales
+# ==================== Temporary Files ====================
 temp/
 *.tmp
 *.bak
-*~
+*.cache
+*.lock
 
-# Carpeta de salida (PDFs comprimidos)
+# ==================== Output & Input PDFs ====================
+# Archivos PDF procesados
 output/*.pdf
+output/**/*.pdf
 
-# Carpeta de entrada (PDFs originales)
+# Archivos PDF originales (opcional)
 input/*.pdf
+input/**/*.pdf
 
-# Sistema operativo
+# Mantener las carpetas vacías
+!input/.gitkeep
+!output/.gitkeep
+!temp/.gitkeep
+
+# ==================== System Files ====================
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+Desktop.ini
 
-# Logs
+# ==================== Logs ====================
 *.log
+logs/
+*.log.*
+
+# ==================== Documentation Artifacts ====================
+# Mantener SPINNERS.md y otros docs importantes
+!SPINNERS.md
+!README.md
+!docs/
+
+# ==================== Test Artifacts ====================
+*.profraw
+*.profdata
+
+# ==================== Backup Files ====================
+*.orig
+*.rej
+*~.nib
+
+# ==================== Compressed Archives ====================
+*.zip
+*.tar.gz
+*.rar
+*.7z
+!examples/*.zip
