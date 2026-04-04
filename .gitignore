@@ -21,7 +21,7 @@ temp/
 output/*.pdf
 
 # Carpeta de entrada (PDFs originales)
-#input/*.pdf
+input/*.pdf
 
 # Sistema operativo
 .DS_Store
