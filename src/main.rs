@@ -3,6 +3,9 @@
 //!
 //! Punto de entrada principal de la aplicación.
 
+#![allow(dead_code)]
+#![allow(unused_imports)]
+
 mod cli;
 mod config;
 mod core;

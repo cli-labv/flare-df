@@ -62,14 +62,14 @@ impl CompressionProcessor {
                 let mut sum = summary.lock().unwrap();
                 if result.success {
                     sum.add_success(&result.name, result.original_size, result.final_size);
-                    pb.set_message(format!(
+                    let _ = pb.println(format!(
                         "✔ {} (-{:.1}%)",
-                        result.name,
+                        truncate_name(&result.name, 50),
                         result.reduction_percent()
                     ));
                 } else {
                     sum.add_failure(&result.name, result.error.as_deref().unwrap_or("Error"));
-                    pb.set_message(format!("✖ {} → Error", result.name));
+                    let _ = pb.println(format!("✖ {} → Error", truncate_name(&result.name, 50)));
                 }
                 pb.inc(1);
             });
@@ -124,4 +124,13 @@ impl CompressionProcessor {
         
         summary
     }
+}
+
+fn truncate_name(name: &str, max: usize) -> String {
+    if name.chars().count() <= max {
+        return name.to_string();
+    }
+    let mut out: String = name.chars().take(max.saturating_sub(3)).collect();
+    out.push_str("...");
+    out
 }

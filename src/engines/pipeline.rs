@@ -5,10 +5,8 @@
 //! según el modo de compresión seleccionado.
 
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 use anyhow::{Result, Context, bail};
 use colored::Colorize;
-use indicatif::{ProgressBar, ProgressStyle as IndicatifStyle};
 use crate::engines::{
     CompressionEngine,
     CompressionMode,
@@ -16,36 +14,6 @@ use crate::engines::{
     GhostscriptEngine,
     EngineDetector,
 };
-
-/// Lista de spinners disponibles para animaciones aleatorias
-const SPINNERS: &[&str] = &[
-    "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏",           // dots
-    "⠁⠂⠄⡀⢀⠠⠐⠈",             // dots2  
-    "⠋⠙⠚⠞⠖⠦⠴⠲⠳⠓",         // dots3
-    "⠄⠆⠇⠋⠙⠸⠰⠠⠰⠸⠙⠋⠇⠆", // dots4
-    "⠋⠙⠚⠒⠂⠂⠒⠲⠴⠦⠖⠒⠐⠐⠒⠓⠋", // dots5
-    "⠁⠉⠙⠚⠒⠂⠂⠒⠲⠴⠤⠄⠄⠤⠴⠲⠒⠂⠂⠒⠚⠙⠉⠁", // dots6
-    "⠈⠉⠋⠓⠒⠐⠐⠒⠖⠦⠤⠠⠠⠤⠦⠖⠒⠐⠐⠒⠓⠋⠉⠈", // dots7
-    "⠁⠁⠉⠙⠚⠒⠂⠂⠒⠲⠴⠤⠄⠄⠤⠠⠠⠤⠦⠖⠒⠐⠐⠒⠓⠋⠉⠈⠈", // dots8
-    "⢹⢺⢼⣸⣇⡧⡗⡏",         // line
-    "⢄⢂⢁⡁⡈⡐⡠",           // line2
-    "◐◓◑◒",                   // arc
-    "◴◷◶◵",                   // arc2
-    "◰◳◲◱",                   // box
-    "▖▘▝▗",                   // square
-    "▌▀▐▄",                   // square2
-    "▉▊▋▌▍▎▏▎▍▌▋▊▉",       // grow
-    "▁▃▄▅▆▇█▇▆▅▄▃",         // vertical
-    "←↖↑↗→↘↓↙",             // arrows
-    "▹▸▹▸▹▸▹▸▹▸▹▸▹▸▹▸▹▸▹▸▹▹▹▹", // triangles
-    "◢◣◤◥",                   // triangle
-    "◡⊙◠",                    // eyes
-    "⣾⣽⣻⢿⡿⣟⣯⣷",         // dots9
-    "⣷⣯⣟⡿⢿⣻⣽⣾",         // dots10
-    "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏",       // dots11
-    "🌑🌒🌓🌔🌕🌖🌗🌘",     // moon
-    "🕐🕑🕒🕓🕔🕕🕖🕗🕘🕙🕚🕛", // clock
-];
 
 /// Estadísticas de compresión de un archivo
 #[derive(Debug, Clone)]
@@ -107,31 +75,6 @@ impl CompressionStats {
     }
 }
 
-/// Selecciona un spinner aleatorio de la lista
-fn get_random_spinner() -> &'static str {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let seed = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos() as usize;
-    SPINNERS[seed % SPINNERS.len()]
-}
-
-/// Crea un ProgressBar con spinner aleatorio
-fn create_spinner(message: &str) -> ProgressBar {
-    let pb = ProgressBar::new_spinner();
-    let spinner_chars = get_random_spinner();
-    pb.set_style(
-        IndicatifStyle::default_spinner()
-            .template("{spinner:.cyan} {msg}")
-            .unwrap()
-            .tick_chars(spinner_chars)
-    );
-    pb.set_message(message.to_string());
-    pb.enable_steady_tick(Duration::from_millis(80));
-    pb
-}
-
 /// Comprime un archivo PDF usando el pipeline apropiado según el modo
 ///
 /// # Argumentos
@@ -181,41 +124,23 @@ pub fn compress_pdf(
     let final_output = match mode {
         CompressionMode::Lossless => {
             // Solo QPDF - compresión lossless pura
-            println!("  {} Ejecutando QPDF (lossless)...", "→".cyan());
-            let spinner = create_spinner("Comprimiendo...");
-            
             let engine = QpdfEngine::new();
-            let result = engine.compress(input_path, output_path)
-                .context("Error durante la compresión con QPDF");
-            
-            spinner.finish_and_clear();
-            result?;
+            engine.compress(input_path, output_path)
+                .context("Error durante la compresión con QPDF")?;
             output_path.to_path_buf()
         }
         
         CompressionMode::HighQuality | CompressionMode::Balanced | CompressionMode::Aggressive => {
             // Pipeline: QPDF primero para optimizaciones estructurales
-            println!("  {} Paso 1: QPDF (optimización estructural)...", "→".cyan());
-            let spinner1 = create_spinner("Comprimiendo...");
-            
             let qpdf_output = temp_dir.join("qpdf_output.pdf");
             let qpdf_engine = QpdfEngine::new();
-            let result1 = qpdf_engine.compress(input_path, &qpdf_output)
-                .context("Error durante la optimización con QPDF");
-            
-            spinner1.finish_and_clear();
-            result1?;
+            qpdf_engine.compress(input_path, &qpdf_output)
+                .context("Error durante la optimización con QPDF")?;
             
             // Luego Ghostscript para compresión inteligente
-            println!("  {} Paso 2: Ghostscript (compresión inteligente)...", "→".cyan());
-            let spinner2 = create_spinner("Comprimiendo...");
-            
             let gs_engine = GhostscriptEngine::new(mode);
-            let result2 = gs_engine.compress(&qpdf_output, output_path)
-                .context("Error durante la compresión con Ghostscript");
-            
-            spinner2.finish_and_clear();
-            result2?;
+            gs_engine.compress(&qpdf_output, output_path)
+                .context("Error durante la compresión con Ghostscript")?;
             
             // Limpiar archivo temporal
             let _ = std::fs::remove_file(qpdf_output);

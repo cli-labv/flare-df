@@ -74,10 +74,6 @@ fn animate_line(text: &str, color: &str, line_delay_ms: u64) {
 
 /// Muestra el banner con animación progresiva
 pub fn show_animated_banner() {
-    // Limpiar pantalla
-    print!("\x1B[2J\x1B[H");
-    io::stdout().flush().unwrap();
-    
     // Mostrar llamas
     for (text, color) in FLAME_ART {
         animate_line(text, color, 50);
@@ -117,8 +113,6 @@ pub fn show_animated_banner() {
 
 /// Muestra el banner sin animación
 pub fn show_simple_banner() {
-    print!("\x1B[2J\x1B[H");
-    
     for (text, color) in FLAME_ART {
         println!("{}", colorize(text, color));
     }

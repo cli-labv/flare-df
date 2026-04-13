@@ -33,6 +33,7 @@ fn is_wide_char(ch: char) -> bool {
 }
 
 /// Crea padding dinámico para alineación
+#[allow(dead_code)]
 pub fn pad_right(s: &str, width: usize) -> String {
     let visual_len = visual_width(s);
     if visual_len >= width {
@@ -43,6 +44,7 @@ pub fn pad_right(s: &str, width: usize) -> String {
 }
 
 /// Crea padding izquierdo
+#[allow(dead_code)]
 pub fn pad_left(s: &str, width: usize) -> String {
     let visual_len = visual_width(s);
     if visual_len >= width {
@@ -53,6 +55,7 @@ pub fn pad_left(s: &str, width: usize) -> String {
 }
 
 /// Crea padding en ambos lados (centrado)
+#[allow(dead_code)]
 pub fn pad_center(s: &str, width: usize) -> String {
     let visual_len = visual_width(s);
     if visual_len >= width {
@@ -71,6 +74,7 @@ pub fn format_bytes(bytes: u64) -> String {
 }
 
 /// Trunca texto a una longitud máxima
+#[allow(dead_code)]
 pub fn truncate_text(text: &str, max_length: usize) -> String {
     if text.len() <= max_length {
         text.to_string()
@@ -85,6 +89,7 @@ pub fn format_percent(value: f64) -> String {
 }
 
 /// Formatea duración en segundos a formato legible
+#[allow(dead_code)]
 pub fn format_duration(seconds: f64) -> String {
     if seconds < 60.0 {
         format!("{:.1}s", seconds)

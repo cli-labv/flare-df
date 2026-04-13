@@ -205,6 +205,7 @@ impl PermissionManager {
     }
     
     /// Asegura que el proyecto tiene permisos de escritura
+    #[allow(dead_code)]
     pub fn ensure_permissions(&self, silent: bool) -> Result<()> {
         // Primero intentar con la contraseña almacenada
         let (success, _) = self.check_permissions_silent();

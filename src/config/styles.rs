@@ -24,7 +24,7 @@ pub const BAR_STYLES: &[(&str, &str)] = &[
     ("blocks", "█▉▊▋▌▍▎▏"),
     ("arrows", "▸▹"),
     ("dots", "●○"),
-    ("flames", "🔥▓▒░"),
+    ("flames", "█▓▒░"),
 ];
 
 /// Presets de estilos completos
@@ -62,7 +62,7 @@ pub fn style_presets() -> Vec<(&'static str, ProgressStyle)> {
         }),
         ("✨ Fuego (fire)", ProgressStyle {
             spinner: "🔥💥✨🔥",
-            bar_chars: "🔥▓▒░",
+            bar_chars: "█▓▒░",
             name: "Fuego",
         }),
     ]

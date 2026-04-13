@@ -22,11 +22,17 @@ pub fn ensure_directories() -> Result<()> {
 /// Asegura que existe el archivo .env
 pub fn ensure_env_file() -> Result<()> {
     let path = env_path();
+    let example_path = crate::config::project_dir().join(".env.example");
+
     if !path.exists() {
-        fs::write(&path, "SUDO_PASSWORD=\n")?;
+        if example_path.exists() {
+            fs::copy(&example_path, &path)?;
+        } else {
+            fs::write(&path, "SUDO_PASSWORD=\nDEBUG=false\n")?;
+        }
     } else {
         let content = fs::read_to_string(&path)?;
-        if !content.contains("SUDO_PASSWORD") {
+        if !content.contains("SUDO_PASSWORD=") {
             let mut new_content = content;
             new_content.push_str("SUDO_PASSWORD=\n");
             fs::write(&path, new_content)?;
@@ -46,6 +52,7 @@ pub fn reset_temp_directory() -> Result<()> {
 }
 
 /// Limpia un directorio
+#[allow(dead_code)]
 pub fn cleanup_directory(path: &Path) -> Result<()> {
     if path.exists() {
         fs::remove_dir_all(path)?;
@@ -61,6 +68,7 @@ pub fn safe_file_size(path: &Path) -> u64 {
 }
 
 /// Copia un archivo
+#[allow(dead_code)]
 pub fn copy_file(source: &Path, destination: &Path) -> Result<()> {
     if let Some(parent) = destination.parent() {
         fs::create_dir_all(parent)?;
