@@ -20,6 +20,19 @@ pub enum CompressionLevel {
     Custom(f64),
 }
 
+/// Organización de salida de PDFs
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum OutputLayout {
+    Grouped,
+    Flat,
+}
+
+impl Default for OutputLayout {
+    fn default() -> Self {
+        Self::Grouped
+    }
+}
+
 impl CompressionLevel {
     /// Obtiene el nombre para mostrar
     pub fn display_name(&self) -> String {
@@ -90,6 +103,7 @@ pub struct PdfTask {
     pub display_name: String,
     pub original_size: u64,
     pub compression_level: CompressionLevel,
+    pub target_path: Option<PathBuf>,
 }
 
 impl PdfTask {
@@ -105,11 +119,17 @@ impl PdfTask {
             display_name,
             original_size,
             compression_level: CompressionLevel::default(),
+            target_path: None,
         }
     }
     
     pub fn with_level(mut self, level: CompressionLevel) -> Self {
         self.compression_level = level;
+        self
+    }
+
+    pub fn with_target_path(mut self, target_path: PathBuf) -> Self {
+        self.target_path = Some(target_path);
         self
     }
     

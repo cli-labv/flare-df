@@ -6,15 +6,20 @@
 use anyhow::Result;
 use colored::Colorize;
 use console::Term;
+use dialoguer::theme::ColorfulTheme;
+use dialoguer::console::{style, Style};
 use dialoguer::{Confirm, Input, Select};
 use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::models::{CompressionLevel, PdfTask, ProgressStyle, WorkMode, CompressionSummary};
+use crate::config::style_presets;
+use crate::models::{CompressionLevel, CompressionSummary, OutputLayout, PdfTask, ProgressStyle, WorkMode};
 use crate::utils::{format_bytes, format_percent, visual_width};
 
 /// Gestor de menús
 pub struct MenuManager {
     term: Term,
+    theme: ColorfulTheme,
 }
 
 impl MenuManager {
@@ -22,30 +27,41 @@ impl MenuManager {
     pub fn new() -> Self {
         Self {
             term: Term::stdout(),
+            theme: ColorfulTheme {
+                prompt_style: Style::new().white().bold(),
+                active_item_style: Style::new().white().bold(),
+                inactive_item_style: Style::new().white().bold(),
+                checked_item_prefix: style("✓".to_string()).green().bold(),
+                unchecked_item_prefix: style(" ".to_string()).white(),
+                active_item_prefix: style("❯".to_string()).green().bold(),
+                ..ColorfulTheme::default()
+            },
         }
     }
     
     /// Muestra el menú de selección de modo
     pub fn select_mode(&self) -> Result<WorkMode> {
         let options = vec![
-            "📂 Modo input (./input)",
-            "📁 Modo external (ruta absoluta)",
-            "🚪 Salir",
+            "📂 Modo input (./input)".green().bold().to_string(),
+            "📁 Modo external (ruta absoluta)".cyan().bold().to_string(),
+            "🚪 Salir".red().bold().to_string(),
         ];
-        
-        let selection = Select::new()
-            .with_prompt("🔥 Selecciona el modo de trabajo")
-            .items(&options)
-            .default(0)
-            .interact_on(&self.term)?;
-        
-        match selection {
-            0 => Ok(WorkMode::Input),
-            1 => {
-                let path = self.ask_external_path()?;
-                Ok(WorkMode::External(path))
+
+        loop {
+            let selection = Select::with_theme(&self.theme)
+                .with_prompt("🔥 Selecciona el modo de trabajo")
+                .items(&options)
+                .default(0)
+                .interact_on(&self.term)?;
+
+            match selection {
+                0 => return Ok(WorkMode::Input),
+                1 => match self.ask_external_path()? {
+                    Some(path) => return Ok(WorkMode::External(path)),
+                    None => continue,
+                },
+                _ => return Ok(WorkMode::Exit),
             }
-            _ => Ok(WorkMode::Exit),
         }
     }
     
@@ -84,14 +100,14 @@ impl MenuManager {
         println!();
         
         let options = vec![
-            "💎 Lossless (~10% reducción) - Sin pérdida visual",
-            "✨ Alta Calidad (~30% reducción) - Mínima pérdida",
-            "⚖️  Balanceado (~50% reducción) - Recomendado",
-            "🔥 Agresivo (~70% reducción) - Máxima compresión",
-            "⚙️  Personalizado - Especifica tu porcentaje",
+            "💎 Lossless (~10% reducción) - Sin pérdida visual".cyan().bold().to_string(),
+            "✨ Alta Calidad (~30% reducción) - Mínima pérdida".green().bold().to_string(),
+            "⚖️  Balanceado (~50% reducción) - Recomendado".yellow().bold().to_string(),
+            "🔥 Agresivo (~70% reducción) - Máxima compresión".red().bold().to_string(),
+            "⚙️  Personalizado - Especifica tu porcentaje".blue().bold().to_string(),
         ];
         
-        let selection = Select::new()
+        let selection = Select::with_theme(&self.theme)
             .with_prompt("🎯 Selecciona el nivel de compresión")
             .items(&options)
             .default(2) // Balanceado por defecto
@@ -104,7 +120,7 @@ impl MenuManager {
             3 => Ok(CompressionLevel::Aggressive),
             4 => {
                 // Modo personalizado - pedir porcentaje
-                let percent_str: String = Input::new()
+                let percent_str: String = Input::with_theme(&self.theme)
                     .with_prompt("⚙️  Porcentaje de compresión deseado (presiona Enter para 70%)")
                     .default("70".to_string())
                     .interact_text()?;
@@ -130,11 +146,11 @@ impl MenuManager {
     /// Muestra el menú de estrategia de ejecución
     pub fn select_execution_strategy(&self) -> Result<bool> {
         let options = vec![
-            "⚡ Paralelo (rápido, recomendado)",
-            "🔄 Secuencial (ver progreso detallado)",
+            "⚡ Paralelo (rápido, recomendado)".green().bold().to_string(),
+            "🔄 Secuencial (ver progreso detallado)".cyan().bold().to_string(),
         ];
         
-        let selection = Select::new()
+        let selection = Select::with_theme(&self.theme)
             .with_prompt("⚙️  ¿Cómo deseas ejecutar la compresión?")
             .items(&options)
             .default(0)
@@ -142,39 +158,66 @@ impl MenuManager {
         
         Ok(selection == 0)
     }
+
+    /// Muestra el menú de organización de salida
+    pub fn select_output_layout(&self) -> Result<OutputLayout> {
+        let options = vec![
+            "📁 Ordenado por carpetas (mantener estructura)".cyan().bold().to_string(),
+            "📄 Plano (todo directo en ./output)".green().bold().to_string(),
+        ];
+
+        let selection = Select::with_theme(&self.theme)
+            .with_prompt("🧭 ¿Cómo deseas guardar los PDFs comprimidos?")
+            .items(&options)
+            .default(0)
+            .interact_on(&self.term)?;
+
+        Ok(match selection {
+            1 => OutputLayout::Flat,
+            _ => OutputLayout::Grouped,
+        })
+    }
     
     /// Muestra el menú de selección de estilo de progreso
     pub fn select_progress_style(&self) -> Result<ProgressStyle> {
-        // Por ahora retorna el estilo por defecto
-        Ok(ProgressStyle::default())
+        let presets = style_presets();
+        let seed = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_nanos() as usize)
+            .unwrap_or(0);
+        let idx = seed % presets.len();
+        Ok(presets[idx].1.clone())
     }
     
     /// Solicita una ruta externa
-    pub fn ask_external_path(&self) -> Result<PathBuf> {
-        loop {
-            let path_str: String = Input::new()
-                .with_prompt("📁 Ruta absoluta de la carpeta")
-                .interact_text()?;
-            
-            let path = PathBuf::from(&path_str);
-            
-            if !path.is_absolute() {
-                println!("{}", "La ruta debe ser absoluta.".yellow());
-                continue;
-            }
-            
-            if !path.exists() {
-                println!("{}", "La ruta indicada no existe.".yellow());
-                continue;
-            }
-            
-            if !path.is_dir() {
-                println!("{}", "Debes indicar un directorio válido.".yellow());
-                continue;
-            }
-            
-            return Ok(path);
+    pub fn ask_external_path(&self) -> Result<Option<PathBuf>> {
+        let path_str: String = Input::with_theme(&self.theme)
+            .with_prompt("📁 Ruta absoluta de la carpeta")
+            .allow_empty(true)
+            .interact_text()?;
+
+        if path_str.trim().is_empty() {
+            return Ok(None);
         }
+
+        let path = PathBuf::from(path_str.trim());
+
+        if !path.is_absolute() {
+            println!("{}", "La ruta debe ser absoluta.".yellow());
+            return Ok(None);
+        }
+
+        if !path.exists() {
+            println!("{}", "La ruta indicada no existe.".yellow());
+            return Ok(None);
+        }
+
+        if !path.is_dir() {
+            println!("{}", "Debes indicar un directorio válido.".yellow());
+            return Ok(None);
+        }
+
+        Ok(Some(path))
     }
     
     /// Maneja el caso de directorio vacío
@@ -186,9 +229,13 @@ impl MenuManager {
         println!("{}", "╰─────────────────────────────────────────────╯".yellow());
         println!();
         
-        let options = vec!["🔄 Reintentar", "🔀 Cambiar modo", "🚪 Salir"];
+        let options = vec![
+            "🔄 Reintentar".green().bold().to_string(),
+            "🔀 Cambiar modo".magenta().bold().to_string(),
+            "🚪 Salir".red().bold().to_string(),
+        ];
         
-        let selection = Select::new()
+        let selection = Select::with_theme(&self.theme)
             .with_prompt("¿Qué deseas hacer?")
             .items(&options)
             .default(0)
@@ -203,7 +250,7 @@ impl MenuManager {
     
     /// Solicita confirmación para iniciar
     pub fn confirm_compression(&self, level: CompressionLevel) -> Result<bool> {
-        let confirmed = Confirm::new()
+        let confirmed = Confirm::with_theme(&self.theme)
             .with_prompt(format!(
                 "🔥 Compresión {} - Se guardarán los PDFs en ./output. ¿Iniciar?",
                 level.display_name()

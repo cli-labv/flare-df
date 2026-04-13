@@ -5,12 +5,15 @@
 
 use anyhow::Result;
 use colored::Colorize;
+use std::collections::HashMap;
+use std::io;
+use std::path::{Path, PathBuf};
 
 use crate::cli::banner::{show_animated_banner, show_goodbye};
 use crate::cli::menus::{MenuManager, DiagnosticDisplay};
 use crate::config::{input_dir, max_workers};
 use crate::core::{PdfScanner, CompressionProcessor};
-use crate::models::{CompressionLevel, PdfTask, WorkMode};
+use crate::models::{CompressionLevel, OutputLayout, PdfTask, WorkMode};
 use crate::utils::{
     ensure_directories, ensure_env_file, reset_temp_directory,
     PermissionManager,
@@ -112,12 +115,14 @@ impl FlareApp {
             
             // Seleccionar nivel de compresión
             let level = self.menu.select_compression_level()?;
+            let output_layout = self.menu.select_output_layout()?;
             
             // Actualizar tareas con el nivel seleccionado
-            let tasks: Vec<PdfTask> = tasks
+            let tasks_with_level: Vec<PdfTask> = tasks
                 .into_iter()
                 .map(|t| t.with_level(level))
                 .collect();
+            let tasks = apply_output_layout(tasks_with_level, &base_path, output_layout);
             
             // Mostrar diagnóstico
             self.display.show_scan_results(&tasks, &base_path, level);
@@ -128,16 +133,12 @@ impl FlareApp {
             // Confirmar compresión
             if !self.menu.confirm_compression(level)? {
                 println!("{}", "Compresión cancelada por el usuario.".yellow());
-                show_goodbye();
-                return Ok(());
+                continue;
             }
             
             // Ejecutar compresión
             self.run_compression(tasks, parallel, level)?;
-            break;
         }
-        
-        Ok(())
     }
     
     /// Escanea con opción de reintentar
@@ -177,12 +178,15 @@ impl FlareApp {
         let _ = reset_temp_directory();
         
         self.display.show_compression_complete(&summary);
-        
-        if summary.has_failures() {
-            std::process::exit(1);
-        }
-        
+        self.wait_for_continue();
+
         Ok(())
+    }
+
+    fn wait_for_continue(&self) {
+        println!("↩️  Presiona Enter para continuar...");
+        let mut input = String::new();
+        let _ = io::stdin().read_line(&mut input);
     }
 }
 
@@ -198,4 +202,44 @@ fn ctrlc_handler() {
         show_goodbye();
         std::process::exit(0);
     });
+}
+
+fn apply_output_layout(tasks: Vec<PdfTask>, base_path: &Path, layout: OutputLayout) -> Vec<PdfTask> {
+    match layout {
+        OutputLayout::Grouped => tasks
+            .into_iter()
+            .map(|task| {
+                let rel_dir = task
+                    .source
+                    .strip_prefix(base_path)
+                    .ok()
+                    .and_then(|rel| rel.parent())
+                    .map(Path::to_path_buf)
+                    .unwrap_or_default();
+                let target = rel_dir.join(task.output_name());
+                task.with_target_path(target)
+            })
+            .collect(),
+        OutputLayout::Flat => {
+            let mut used_names: HashMap<String, usize> = HashMap::new();
+            tasks
+                .into_iter()
+                .map(|task| {
+                    let stem = task
+                        .source
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("unknown")
+                        .to_string();
+                    let count = used_names.entry(stem.clone()).and_modify(|n| *n += 1).or_insert(1);
+                    let file_name = if *count == 1 {
+                        format!("{stem}_compressed.pdf")
+                    } else {
+                        format!("{stem}_compressed_{}.pdf", *count)
+                    };
+                    task.with_target_path(PathBuf::from(file_name))
+                })
+                .collect()
+        }
+    }
 }

@@ -7,7 +7,7 @@ use anyhow::{Result, Context, bail};
 use std::fs;
 
 use crate::config::output_dir;
-use crate::models::{CompressionLevel, CompressionResult, PdfTask};
+use crate::models::{CompressionResult, PdfTask};
 use crate::engines::{compress_pdf, EngineDetector};
 
 /// Compresor de PDFs usando motores externos
@@ -65,7 +65,11 @@ impl PdfCompressor {
         }
         
         // Preparar ruta de salida
-        let output_path = output_dir().join(task.output_name());
+        let relative_output = task
+            .target_path
+            .clone()
+            .unwrap_or_else(|| task.output_name().into());
+        let output_path = output_dir().join(relative_output);
         
         // Asegurar que el directorio de salida existe
         if let Some(parent) = output_path.parent() {
