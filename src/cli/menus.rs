@@ -69,52 +69,85 @@ impl MenuManager {
     /// Muestra el menú de selección de nivel de compresión
     pub fn select_compression_level(&self) -> Result<CompressionLevel> {
         println!();
-        println!("{}", "╭─────────────────────────────────────────────────────────────────╮".magenta());
-        println!("{}", "│              🔧 NIVELES DE COMPRESIÓN                           │".magenta());
-        println!("{}", "├─────────────────────────────────────────────────────────────────┤".magenta());
-        println!("│  {} {} - {} │", 
-            "💎".to_string(),
-            "Lossless".cyan(),
-            "100% sin pérdida - Solo optimizaciones estructurales"
-        );
-        println!("│  {} {} - {}  │", 
-            "✨".to_string(),
-            "Alta Calidad".green(),
-            "Compresión inteligente con mínima pérdida visual"
-        );
-        println!("│  {} {} - {}  │", 
-            "⚖️".to_string(),
-            "Balanceado".yellow(),
-            "Equilibrio óptimo calidad/tamaño (Recomendado)"
-        );
-        println!("│  {} {} - {}     │", 
-            "🛡️".to_string(),
-            "Optimizado".bright_blue(),
-            "Compresión alta con buena calidad visual"
-        );
-        println!("│  {} {} - {}         │", 
-            "🔥".to_string(),
-            "Agresivo".red(),
-            "Máxima compresión con calidad aceptable"
-        );
-        println!("│  {} {} - {}       │", 
-            "⚙️".to_string(),
-            "Personalizado".blue(),
-            "Especifica tu propio porcentaje (default: 70%)"
-        );
-        println!("{}", "╰─────────────────────────────────────────────────────────────────╯".magenta());
+        let lines = vec![
+            format!(
+                "  {} {} - {}",
+                pad_emoji("💎"),
+                "Lossless".cyan(),
+                "100% sin pérdida - Solo optimizaciones estructurales"
+            ),
+            format!(
+                "  {} {} - {}",
+                pad_emoji("✨"),
+                "Alta Calidad".green(),
+                "Compresión inteligente con mínima pérdida visual"
+            ),
+            format!(
+                "  {}  {} - {}",
+                pad_emoji("⚖️"),
+                "Balanceado".yellow(),
+                "Equilibrio óptimo calidad/tamaño (Recomendado)"
+            ),
+            format!(
+                "  {}  {} - {}",
+                pad_emoji("🛡️"),
+                "Optimizado".purple(),
+                "Compresión alta con buena calidad visual"
+            ),
+            format!(
+                "  {} {} - {}",
+                pad_emoji("🔥"),
+                "Agresivo".red(),
+                "Máxima compresión con calidad aceptable"
+            ),
+            format!(
+                "  {}  {} - {}",
+                pad_emoji("⚙️"),
+                "Personalizado".white(),
+                "Especifica tu propio porcentaje"
+            ),
+        ];
+        let content_width = lines
+            .iter()
+            .map(|line| measure_text_width(line))
+            .max()
+            .unwrap_or(0)
+            + 5;
+        let border = "─".repeat(content_width);
+        println!("{}", format!("╭{}╮", border).magenta());
+        let title = "              🔧 NIVELES DE COMPRESIÓN";
+        println!("{}", format!("│{}│", pad_to_width(title, content_width)).magenta());
+        println!("{}", format!("├{}┤", border).magenta());
+        for line in lines {
+            println!("│{}│", pad_to_width(&line, content_width));
+        }
+        println!("{}", format!("╰{}╯", border).magenta());
         println!();
         
         let options = vec![
             "💎 Lossless (~10% reducción) - Sin pérdida visual".cyan().bold().to_string(),
             "✨ Alta Calidad (~30% reducción) - Mínima pérdida".green().bold().to_string(),
             "⚖️  Balanceado (~50% reducción) - Recomendado".yellow().bold().to_string(),
-            "🛡️  Optimizado (~60% reducción) - Más compresión con buena calidad".bright_blue().bold().to_string(),
+            "🛡️  Optimizado (~60% reducción) - Más compresión con buena calidad".purple().bold().to_string(),
             "🔥 Agresivo (~70% reducción) - Máxima compresión".red().bold().to_string(),
-            "⚙️  Personalizado - Especifica tu porcentaje".blue().bold().to_string(),
+            "⚙️  Personalizado - Especifica tu porcentaje".white().bold().to_string(),
         ];
         
         let selection = self.select_list("🎯 Selecciona el nivel de compresión", &options, 2)?;
+
+        let short_label = match selection {
+            0 => "💎  Lossless",
+            1 => "✨  Alta Calidad",
+            2 => "⚖️  Balanceado",
+            3 => "🛡️  Optimizado",
+            4 => "🔥  Agresivo",
+            5 => "⚙️  Personalizado",
+            _ => "⚖️  Balanceado",
+        };
+        println!(
+            "✔ 🎯 Selecciona el nivel de compresión · {}",
+            short_label.white().bold()
+        );
         
         match selection {
             0 => Ok(CompressionLevel::Lossless),
@@ -125,13 +158,15 @@ impl MenuManager {
             5 => {
                 // Modo personalizado - pedir porcentaje
                 let percent_str: String = Input::with_theme(&self.theme)
-                    .with_prompt("⚙️  Porcentaje de compresión deseado (presiona Enter para 70%)")
-                    .default("70".to_string())
+                    .with_prompt("⚙️  Porcentaje de compresión deseado (70)")
+                    .allow_empty(true)
                     .interact_text()?;
                 
-                let mut percent: f64 = percent_str.trim()
-                    .parse()
-                    .unwrap_or(70.0);
+                let mut percent: f64 = if percent_str.trim().is_empty() {
+                    70.0
+                } else {
+                    percent_str.trim().parse().unwrap_or(70.0)
+                };
                 
                 // Limitar entre 0-99%
                 if percent < 0.0 {
@@ -193,7 +228,6 @@ impl MenuManager {
             }
         }
 
-        println!("✔ {} · {}", prompt, options[current]);
         Ok(current)
     }
     
@@ -329,6 +363,25 @@ fn count_wrapped_lines(term: &Term, line: &str) -> usize {
     let lines = (width + cols - 1) / cols;
     if lines == 0 { 1 } else { lines }
 }
+
+fn pad_to_width(text: &str, width: usize) -> String {
+    let current = measure_text_width(text);
+    if current >= width {
+        text.to_string()
+    } else {
+        format!("{text}{}", " ".repeat(width - current))
+    }
+}
+
+fn pad_emoji(emoji: &str) -> String {
+    let width = measure_text_width(emoji);
+    if width >= 2 {
+        emoji.to_string()
+    } else {
+        format!("{emoji}{}", " ".repeat(2 - width))
+    }
+}
+
 
 /// Visualizador de diagnósticos
 pub struct DiagnosticDisplay;
