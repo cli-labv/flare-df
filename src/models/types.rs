@@ -14,6 +14,8 @@ pub enum CompressionLevel {
     HighQuality,
     /// Balanceado - Buen equilibrio calidad/tamaño (recomendado)
     Balanced,
+    /// Optimizado - Compresión alta manteniendo buena calidad visual
+    Optimized,
     /// Agresivo - Máxima compresión
     Aggressive,
     /// Personalizado - El usuario especifica el porcentaje
@@ -40,6 +42,7 @@ impl CompressionLevel {
             Self::Lossless => "Lossless".to_string(),
             Self::HighQuality => "Alta Calidad".to_string(),
             Self::Balanced => "Balanceado".to_string(),
+            Self::Optimized => "Optimizado".to_string(),
             Self::Aggressive => "Agresivo".to_string(),
             Self::Custom(percent) => format!("Personalizado ({}%)", percent),
         }
@@ -51,6 +54,7 @@ impl CompressionLevel {
             Self::Lossless => "100% sin pérdida - Solo optimizaciones estructurales",
             Self::HighQuality => "Compresión inteligente con mínima pérdida visual",
             Self::Balanced => "Equilibrio óptimo entre calidad y tamaño",
+            Self::Optimized => "Compresión alta con buena calidad para PDFs con imágenes",
             Self::Aggressive => "Máxima compresión con calidad aceptable",
             Self::Custom(_) => "Nivel de compresión personalizado",
         }
@@ -62,6 +66,7 @@ impl CompressionLevel {
             Self::Lossless => 10.0,
             Self::HighQuality => 30.0,
             Self::Balanced => 50.0,
+            Self::Optimized => 60.0,
             Self::Aggressive => 70.0,
             Self::Custom(percent) => *percent,
         }
@@ -73,6 +78,7 @@ impl CompressionLevel {
             Self::Lossless => "💎",
             Self::HighQuality => "✨",
             Self::Balanced => "⚖️",
+            Self::Optimized => "🛡️",
             Self::Aggressive => "🔥",
             Self::Custom(_) => "⚙️",
         }
@@ -85,7 +91,12 @@ impl CompressionLevel {
             Self::Lossless => CompressionMode::Lossless,
             Self::HighQuality => CompressionMode::HighQuality,
             Self::Balanced => CompressionMode::Balanced,
-            Self::Aggressive | Self::Custom(_) => CompressionMode::Aggressive,
+            Self::Optimized => CompressionMode::Optimized,
+            Self::Aggressive => CompressionMode::Aggressive,
+            Self::Custom(percent) => {
+                let clamped = percent.clamp(0.0, 99.0).round() as u8;
+                CompressionMode::Custom(clamped)
+            }
         }
     }
 }
@@ -205,7 +216,7 @@ impl CompressionResult {
         if self.original_size == 0 || !self.success {
             return 0.0;
         }
-        ((self.original_size - self.final_size) as f64 / self.original_size as f64) * 100.0
+        ((self.original_size as f64 - self.final_size as f64) / self.original_size as f64) * 100.0
     }
 }
 
@@ -253,7 +264,7 @@ impl CompressionSummary {
         if self.total_original == 0 {
             return 0.0;
         }
-        (self.total_saved() as f64 / self.total_original as f64) * 100.0
+        ((self.total_original as f64 - self.total_compressed as f64) / self.total_original as f64) * 100.0
     }
 }
 

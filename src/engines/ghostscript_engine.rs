@@ -23,6 +23,60 @@ impl GhostscriptEngine {
     pub fn new(mode: CompressionMode) -> Self {
         Self { mode }
     }
+
+    fn custom_percent(&self) -> u8 {
+        match self.mode {
+            CompressionMode::Custom(percent) => percent.clamp(0, 99),
+            _ => 0,
+        }
+    }
+
+    fn lerp_u32(start: u32, end: u32, p: u8, p_start: u8, p_end: u8) -> u32 {
+        if p_end <= p_start {
+            return end;
+        }
+        let t = (p.saturating_sub(p_start)) as f64 / (p_end - p_start) as f64;
+        let value = start as f64 + (end as f64 - start as f64) * t;
+        value.round() as u32
+    }
+
+    fn custom_resolutions(&self) -> (u32, u32, u32) {
+        let p = self.custom_percent();
+        if p <= 30 {
+            // Similar a Alta Calidad.
+            return (300, 300, 1200);
+        }
+        if p <= 50 {
+            // Transición Alta Calidad -> Balanceado.
+            return (
+                Self::lerp_u32(300, 150, p, 30, 50),
+                Self::lerp_u32(300, 150, p, 30, 50),
+                Self::lerp_u32(1200, 600, p, 30, 50),
+            );
+        }
+        if p <= 60 {
+            // Transición Balanceado -> Optimizado.
+            return (
+                Self::lerp_u32(150, 120, p, 50, 60),
+                Self::lerp_u32(150, 120, p, 50, 60),
+                Self::lerp_u32(600, 450, p, 50, 60),
+            );
+        }
+        if p <= 70 {
+            // Transición Optimizado -> Agresivo.
+            return (
+                Self::lerp_u32(120, 72, p, 60, 70),
+                Self::lerp_u32(120, 72, p, 60, 70),
+                Self::lerp_u32(450, 300, p, 60, 70),
+            );
+        }
+        // Zona más fuerte que Agresivo.
+        (
+            Self::lerp_u32(72, 60, p, 70, 99),
+            Self::lerp_u32(72, 60, p, 70, 99),
+            Self::lerp_u32(300, 220, p, 70, 99),
+        )
+    }
     
     /// Obtiene el perfil de calidad según el modo de compresión
     fn get_pdfsettings(&self) -> &'static str {
@@ -30,7 +84,17 @@ impl GhostscriptEngine {
             CompressionMode::Lossless => "/default", // No debería usarse, pero por seguridad
             CompressionMode::HighQuality => "/printer",
             CompressionMode::Balanced => "/ebook",
+            CompressionMode::Optimized => "/ebook",
             CompressionMode::Aggressive => "/screen",
+            CompressionMode::Custom(percent) => {
+                if percent <= 40 {
+                    "/printer"
+                } else if percent <= 65 {
+                    "/ebook"
+                } else {
+                    "/screen"
+                }
+            }
         }
     }
     
@@ -40,7 +104,9 @@ impl GhostscriptEngine {
             CompressionMode::Lossless => 300,
             CompressionMode::HighQuality => 300,
             CompressionMode::Balanced => 150,
+            CompressionMode::Optimized => 120,
             CompressionMode::Aggressive => 72,
+            CompressionMode::Custom(_) => self.custom_resolutions().0,
         }
     }
     
@@ -50,7 +116,9 @@ impl GhostscriptEngine {
             CompressionMode::Lossless => 300,
             CompressionMode::HighQuality => 300,
             CompressionMode::Balanced => 150,
+            CompressionMode::Optimized => 120,
             CompressionMode::Aggressive => 72,
+            CompressionMode::Custom(_) => self.custom_resolutions().1,
         }
     }
     
@@ -60,7 +128,9 @@ impl GhostscriptEngine {
             CompressionMode::Lossless => 1200,
             CompressionMode::HighQuality => 1200,
             CompressionMode::Balanced => 600,
+            CompressionMode::Optimized => 450,
             CompressionMode::Aggressive => 300,
+            CompressionMode::Custom(_) => self.custom_resolutions().2,
         }
     }
     

@@ -5,10 +5,11 @@
 
 use anyhow::Result;
 use colored::Colorize;
-use console::Term;
+use console::{Key, Term, measure_text_width};
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::console::{style, Style};
 use dialoguer::{Confirm, Input, Select};
+use std::io::Write;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -86,6 +87,11 @@ impl MenuManager {
             "Balanceado".yellow(),
             "Equilibrio óptimo calidad/tamaño (Recomendado)"
         );
+        println!("│  {} {} - {}     │", 
+            "🛡️".to_string(),
+            "Optimizado".bright_blue(),
+            "Compresión alta con buena calidad visual"
+        );
         println!("│  {} {} - {}         │", 
             "🔥".to_string(),
             "Agresivo".red(),
@@ -103,22 +109,20 @@ impl MenuManager {
             "💎 Lossless (~10% reducción) - Sin pérdida visual".cyan().bold().to_string(),
             "✨ Alta Calidad (~30% reducción) - Mínima pérdida".green().bold().to_string(),
             "⚖️  Balanceado (~50% reducción) - Recomendado".yellow().bold().to_string(),
+            "🛡️  Optimizado (~60% reducción) - Más compresión con buena calidad".bright_blue().bold().to_string(),
             "🔥 Agresivo (~70% reducción) - Máxima compresión".red().bold().to_string(),
             "⚙️  Personalizado - Especifica tu porcentaje".blue().bold().to_string(),
         ];
         
-        let selection = Select::with_theme(&self.theme)
-            .with_prompt("🎯 Selecciona el nivel de compresión")
-            .items(&options)
-            .default(2) // Balanceado por defecto
-            .interact_on(&self.term)?;
+        let selection = self.select_list("🎯 Selecciona el nivel de compresión", &options, 2)?;
         
         match selection {
             0 => Ok(CompressionLevel::Lossless),
             1 => Ok(CompressionLevel::HighQuality),
             2 => Ok(CompressionLevel::Balanced),
-            3 => Ok(CompressionLevel::Aggressive),
-            4 => {
+            3 => Ok(CompressionLevel::Optimized),
+            4 => Ok(CompressionLevel::Aggressive),
+            5 => {
                 // Modo personalizado - pedir porcentaje
                 let percent_str: String = Input::with_theme(&self.theme)
                     .with_prompt("⚙️  Porcentaje de compresión deseado (presiona Enter para 70%)")
@@ -141,6 +145,56 @@ impl MenuManager {
             }
             _ => Ok(CompressionLevel::Balanced),
         }
+    }
+
+    fn select_list(&self, prompt: &str, options: &[String], default: usize) -> Result<usize> {
+        if !self.term.features().is_attended() || options.is_empty() {
+            return Ok(default.min(options.len().saturating_sub(1)));
+        }
+
+        let mut current = default.min(options.len().saturating_sub(1));
+        let mut rendered_lines = 0usize;
+
+        loop {
+            if rendered_lines > 0 {
+                print!("\x1B[{}A", rendered_lines);
+                print!("\x1B[J");
+            }
+
+            let prompt_line = format!("? {}", prompt);
+            println!("{}", prompt_line);
+            rendered_lines = count_wrapped_lines(&self.term, &prompt_line);
+
+            for (idx, option) in options.iter().enumerate() {
+                let line = if idx == current {
+                    format!("  {} {}", "❯".green().bold(), option)
+                } else {
+                    format!("    {}", option)
+                };
+                println!("{}", line);
+                rendered_lines += count_wrapped_lines(&self.term, &line);
+            }
+
+            std::io::stdout().flush()?;
+
+            match self.term.read_key()? {
+                Key::ArrowUp => {
+                    if current == 0 {
+                        current = options.len() - 1;
+                    } else {
+                        current -= 1;
+                    }
+                }
+                Key::ArrowDown => {
+                    current = (current + 1) % options.len();
+                }
+                Key::Enter => break,
+                _ => {}
+            }
+        }
+
+        println!("✔ {} · {}", prompt, options[current]);
+        Ok(current)
     }
     
     /// Muestra el menú de estrategia de ejecución
@@ -268,6 +322,14 @@ impl Default for MenuManager {
     }
 }
 
+fn count_wrapped_lines(term: &Term, line: &str) -> usize {
+    let (_, cols) = term.size();
+    let cols = if cols == 0 { 80 } else { cols as usize };
+    let width = measure_text_width(line);
+    let lines = (width + cols - 1) / cols;
+    if lines == 0 { 1 } else { lines }
+}
+
 /// Visualizador de diagnósticos
 pub struct DiagnosticDisplay;
 
@@ -389,16 +451,43 @@ impl DiagnosticDisplay {
         // Tamaño
         let size_before = format_bytes(summary.total_original);
         let size_after = format_bytes(summary.total_compressed);
-        let reduction = format_percent(summary.reduction_percent());
-        let sizes_text = format!("💾 {} → {} (-{})", size_before.white(), size_after.green(), reduction.bright_green());
-        let sizes_visual = visual_width("💾 ") + size_before.len() + " → ".len() + size_after.len() + " (-".len() + reduction.len() + ")".len();
+        let reduction = summary.reduction_percent();
+        let reduction_str = format_percent(reduction.abs());
+        let (sizes_text, sizes_visual) = if reduction >= 0.0 {
+            let txt = format!(
+                "💾 {} → {} (-{})",
+                size_before.white(),
+                size_after.green(),
+                reduction_str.bright_green()
+            );
+            let visual = visual_width("💾 ") + size_before.len() + " → ".len() + size_after.len() + " (-".len() + reduction_str.len() + ")".len();
+            (txt, visual)
+        } else {
+            let txt = format!(
+                "💾 {} → {} (+{})",
+                size_before.white(),
+                size_after.red(),
+                reduction_str.red()
+            );
+            let visual = visual_width("💾 ") + size_before.len() + " → ".len() + size_after.len() + " (+".len() + reduction_str.len() + ")".len();
+            (txt, visual)
+        };
         let sizes_padding = BOX_WIDTH.saturating_sub(sizes_visual + 4);
         println!("║  {}{}  ║", sizes_text, " ".repeat(sizes_padding));
         
-        // Espacio ahorrado
-        let saved = format_bytes(summary.total_saved());
-        let saved_text = format!("✨ Espacio ahorrado: {}", saved.bright_green());
-        let saved_visual = visual_width("✨ Espacio ahorrado: ") + saved.len();
+        // Espacio ahorrado o incremento
+        let (saved_text, saved_visual) = if summary.total_compressed <= summary.total_original {
+            let saved = format_bytes(summary.total_saved());
+            let text = format!("✨ Espacio ahorrado: {}", saved.bright_green());
+            let visual = visual_width("✨ Espacio ahorrado: ") + saved.len();
+            (text, visual)
+        } else {
+            let increase = summary.total_compressed - summary.total_original;
+            let inc_str = format_bytes(increase);
+            let text = format!("⚠️  Incremento tamaño: {}", inc_str.red());
+            let visual = visual_width("⚠️  Incremento tamaño: ") + inc_str.len();
+            (text, visual)
+        };
         let saved_padding = BOX_WIDTH.saturating_sub(saved_visual + 4);
         println!("║  {}{}  ║", saved_text, " ".repeat(saved_padding));
         

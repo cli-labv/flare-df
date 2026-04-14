@@ -17,10 +17,18 @@ pub enum CompressionMode {
     /// Balanceado - buen balance entre calidad y tamaño
     /// Usa qpdf + Ghostscript con perfil /ebook + resolución controlada
     Balanced,
+
+    /// Optimizado - más compresión que balanceado, manteniendo buena calidad
+    /// Usa qpdf + Ghostscript con downsampling moderado
+    Optimized,
     
     /// Agresivo - máxima compresión con calidad aceptable
     /// Usa qpdf + Ghostscript con perfil /screen + downsampling fuerte
     Aggressive,
+
+    /// Personalizado - compresión variable según porcentaje del usuario
+    /// Usa qpdf + Ghostscript con parámetros calculados dinámicamente
+    Custom(u8),
 }
 
 impl CompressionMode {
@@ -30,6 +38,7 @@ impl CompressionMode {
             Self::Lossless,
             Self::HighQuality,
             Self::Balanced,
+            Self::Optimized,
             Self::Aggressive,
         ]
     }
@@ -40,7 +49,9 @@ impl CompressionMode {
             Self::Lossless => "100% lossless - Solo optimizaciones estructurales (máxima calidad)",
             Self::HighQuality => "Alta calidad - Compresión inteligente con mínima pérdida visual",
             Self::Balanced => "Balanceado - Buen equilibrio calidad/tamaño (recomendado)",
+            Self::Optimized => "Optimizado - Compresión alta con buena calidad visual",
             Self::Aggressive => "Agresivo - Máxima compresión con calidad aceptable",
+            Self::Custom(_) => "Personalizado - Compresión variable según porcentaje",
         }
     }
     
@@ -50,7 +61,9 @@ impl CompressionMode {
             Self::Lossless => "~5-15%",
             Self::HighQuality => "~20-40%",
             Self::Balanced => "~40-60%",
+            Self::Optimized => "~50-70%",
             Self::Aggressive => "~60-80%",
+            Self::Custom(_) => "Variable (según porcentaje)",
         }
     }
     
@@ -74,7 +87,9 @@ impl fmt::Display for CompressionMode {
             Self::Lossless => "Lossless",
             Self::HighQuality => "High Quality",
             Self::Balanced => "Balanced",
+            Self::Optimized => "Optimized",
             Self::Aggressive => "Aggressive",
+            Self::Custom(percent) => return write!(f, "Custom ({}%)", percent),
         };
         write!(f, "{}", name)
     }

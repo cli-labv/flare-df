@@ -86,6 +86,7 @@ impl CompressionStats {
 /// - **Lossless**: Solo QPDF (optimizaciones estructurales)
 /// - **HighQuality**: QPDF → Ghostscript (/printer, 300 dpi)
 /// - **Balanced**: QPDF → Ghostscript (/ebook, 150 dpi)
+/// - **Optimized**: QPDF → Ghostscript (/ebook, 120 dpi)
 /// - **Aggressive**: QPDF → Ghostscript (/screen, 72 dpi)
 ///
 /// # Retorna
@@ -130,7 +131,11 @@ pub fn compress_pdf(
             output_path.to_path_buf()
         }
         
-        CompressionMode::HighQuality | CompressionMode::Balanced | CompressionMode::Aggressive => {
+        CompressionMode::HighQuality
+        | CompressionMode::Balanced
+        | CompressionMode::Optimized
+        | CompressionMode::Aggressive
+        | CompressionMode::Custom(_) => {
             // Pipeline: QPDF primero para optimizaciones estructurales
             let qpdf_output = temp_dir.join("qpdf_output.pdf");
             let qpdf_engine = QpdfEngine::new();
