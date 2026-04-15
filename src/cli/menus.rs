@@ -8,7 +8,7 @@ use colored::Colorize;
 use console::{Key, Term, measure_text_width};
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::console::{style, Style};
-use dialoguer::{Confirm, Input, Select};
+use dialoguer::{Input, Select};
 use std::io::Write;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -338,15 +338,30 @@ impl MenuManager {
     
     /// Solicita confirmación para iniciar
     pub fn confirm_compression(&self, level: CompressionLevel) -> Result<bool> {
-        let confirmed = Confirm::with_theme(&self.theme)
-            .with_prompt(format!(
-                "🔥 Compresión {} - Se guardarán los PDFs en ./output. ¿Iniciar?",
-                level.display_name()
-            ))
-            .default(true)
-            .interact()?;
-        
-        Ok(confirmed)
+        let prompt = format!("🔥 Iniciar compresión ({})", level.display_name());
+        let prompt_styled = prompt.white().bold().to_string();
+
+        loop {
+            print!("? {} (y/n) ", prompt_styled);
+            std::io::stdout().flush()?;
+
+            let confirmed = match self.term.read_key()? {
+                Key::Enter => Some(true),
+                Key::Char('y') | Key::Char('Y') => Some(true),
+                Key::Char('n') | Key::Char('N') => Some(false),
+                _ => None,
+            };
+
+            if let Some(value) = confirmed {
+                print!("\r\x1B[2K");
+                println!(
+                    "✔ {} · {}",
+                    prompt_styled,
+                    if value { "yes" } else { "no" }
+                );
+                return Ok(value);
+            }
+        }
     }
 }
 
